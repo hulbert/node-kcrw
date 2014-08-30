@@ -1,0 +1,27 @@
+{
+	"name": "kcrw",
+	"version": "0.1.0",
+	"description": "Play KCRW in your terminal",
+	"bin" : {
+		"kcrw" : "play.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/hulbert/node-kcrw.git"
+	},
+	"keywords": [
+		"radio",
+		"music",
+		"kcrw"
+	],
+	"author": "Scott Hulbert <scott@scotthulbert.com> (http://scotthulbert.com)",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/hulbert/node-kcrw/issues"
+	},
+	"homepage": "https://github.com/hulbert/node-kcrw",
+	"dependencies": {
+		"lame": "^1.1.1",
+		"speaker": "^0.2.1"
+	}
+}
