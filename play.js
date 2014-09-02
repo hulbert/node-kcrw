@@ -7,12 +7,14 @@ var util = require('util');
 // 3rd party
 var lame = require('lame');
 var Speaker = require('speaker');
+var Promise = require('bluebird');
 
 // package.json info
 var packageInfo = require('./package.json');
 
 var STREAM_URL = 'http://kcrw.ic.llnwd.net/stream/kcrw_live';
 var CURRENT_TRACK_URL = 'http://tracklist-api.kcrw.com/Simulcast';
+
 var USER_AGENT = util.format('node-kcrw (%s)', packageInfo.version);
 console.log(USER_AGENT)
 
@@ -51,6 +53,27 @@ function get(uri, callback) {
 	return http.get(options, callback);
 }
 
+// returns a promise, wrapping our get() fn
+function getAnd(uri) {
+	return new Promise(function(resolve, reject) {
+		var req = get(uri, function(res) {
+			var data = '';
+
+			res.on('data', function(chunk) {
+				data += chunk;
+			});
+
+			res.on('end', function() {
+				resolve(data);
+			});
+		})
+	
+		req.on('error', function(err) {
+			reject(err);
+		});
+	});
+}
+
 // wrap lines, breaking on spaces; columns arg is optional number
 function notTooWide(str, columns) {
 	if (isNaN(columns)) columns = columnWidth();
@@ -79,14 +102,8 @@ function printLatestTrack() {
 	checkLatest();
 
 	function checkLatest() {
-		var req = http.get(CURRENT_TRACK_URL, function(res) {
-			var data = '';
-
-			res.on('data', function(chunk) {
-				data += chunk;
-			});
-
-			res.on('end', function() {
+		getAnd(CURRENT_TRACK_URL)
+			.then( function(data) {
 				if (currentTrackBody !== data) {
 					currentTrackBody = data;
 					var song = JSON.parse(data);
@@ -96,7 +113,7 @@ function printLatestTrack() {
 						
 						var stationBadge = 'KCRW: Member supported independent public radio - http://kcrw.com/join';
 						var sep = Array(columnWidth()+1).join('=');
-
+						
 						console.log( util.format('\n%s\n%s\n\nCurrent Host: %s\n%s\n\n', sep, stationBadge, song.host, sep) );
 					}
 
@@ -116,11 +133,9 @@ function printLatestTrack() {
 				} else {
 					setTimeout(checkLatest)
 				}
+			})
+			.catch( function(err) {
+				setTimeout(checkLatest, 4000);
 			});
-		});
-		
-		req.on('error', function() {
-			setTimeout(checkLatest, 4000);
-		})
 	}
 }
