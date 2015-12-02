@@ -1,7 +1,7 @@
 # node-kcrw
 
 Play the KCRW live stream in your Terminal. Because why not.  
-Made mostly possibe by [node-lame][NodeLame] and [node-speaker][AodeSpeaker].
+Made mostly possibe by [node-lame][NodeLame] and [node-speaker][NodeSpeaker].
 
 ## Install
 
