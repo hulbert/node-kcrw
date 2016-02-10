@@ -9,26 +9,43 @@ var lame = require('lame')
 var Speaker = require('speaker')
 var Promise = require('bluebird')
 
-// package.json info
+var CHANNELS = require('./channels')
 var packageInfo = require('./package.json')
 
-var STREAM_URL = 'http://kcrw.ic.llnwd.net/stream/kcrw_live'
-var CURRENT_TRACK_URL = 'http://tracklist-api.kcrw.com/Simulcast'
-var NOW_PLAYING_URL = 'http://www.kcrw.com/now_playing.json'
-
 var USER_AGENT = util.format('node-kcrw (%s)', packageInfo.version)
-console.log(USER_AGENT)
 
 
-get(STREAM_URL, function(res) {
-	res.pipe(new lame.Decoder())
-	   .pipe(new Speaker())
-
-	printLatestTrack()
-})
+function main() {
+	var options = process.argv.slice(2)
+	
+	if (options.length > 1 || options[0] === '-h' || options[0] === '--help' || (typeof options[0] === 'string' && !CHANNELS.hasOwnProperty(options[0]))) {
+		console.log(USER_AGENT, '\n\nUsage: kcrw [channel]', '\n\nSupported channels:\n -', Object.keys(CHANNELS).join('\n - '))
+		return
+	}
+	
+	var channelName = options[0] || 'live'
+	playChannel(channelName)
+}
+main()
 
 
 /* Hoisted functions only */
+
+function playChannel(channelName) {
+	var channelSettings = CHANNELS[channelName]
+	
+	console.log(USER_AGENT)
+
+    get(channelSettings.stream, function(res) {
+		res.pipe(new lame.Decoder())
+		   .pipe(new Speaker())
+
+		printLatestTrack({
+			trackUrl: channelSettings.track,
+			nowPlayingUrl: channelSettings.nowPlaying
+		})
+	})
+}
 
 // get the width of terminal, or default
 function columnWidth() {
@@ -95,28 +112,52 @@ function notTooWide(str, columns) {
 }
 
 // calls checkLatest recursively internally
-function printLatestTrack() {
+/**
+ * Begin printing info, calls checkLatest recursively internally.
+ * 
+ * @param {Object} settings
+ * @param settings.nowPlayingUrl
+ * @param settings.trackUrl
+ */
+function printLatestTrack(settings) {
 	var currentTrackBody = null
 	var currentHost = null
 
-	checkLatest()
+	checkLatest(true)
 
-	function checkLatest() {
+	function checkLatest(firstRun) {
 		Promise.all([
-			getAnd(NOW_PLAYING_URL),
-			getAnd(CURRENT_TRACK_URL)
-		]).spread( function(nowPlayingData, currentTrackData) {
+			getAnd(settings.nowPlayingUrl),
+			getAnd(settings.trackUrl)
+		]).spread(function(nowPlayingData, currentTrackData) {
 			var nowPlaying = JSON.parse(nowPlayingData)
 			
 			// check for host change
-			var host1 = nowPlaying['hosts'][0]['name']
-			if (host1 != currentHost) {
-				currentHost = host1
-				
+			var host1 = null
+			if (nowPlaying.hosts && nowPlaying.hosts.length > 0) {
+				host1 = nowPlaying['hosts'][0]['name']
+			}
+			
+			var printOut = function(host, showTitle) {
 				var stationBadge = 'KCRW: Member supported independent public radio - http://kcrw.com/join'
 				var sep = Array(columnWidth()+1).join('=')
 				
-				console.log( util.format('\n%s\n%s\n\nCurrent Host: %s (%s)\n%s\n\n', sep, stationBadge, host1, nowPlaying.show_title, sep) )
+				var str = util.format('\n%s\n%s\n\nCurrently playing: ', sep, stationBadge)
+				if (host) {
+					str += util.format('%s (%s)', host1, showTitle)
+				} else {
+					str += showTitle
+				}				
+				str += util.format('\n%s\n\n', sep)
+				console.log(str)
+			}
+			
+			if (firstRun) {
+				currentHost = host1
+				printOut(host1, nowPlaying.show_title)
+			} else if (host1 !== currentHost) { // this gets skipped for host-less shows after first run
+				currentHost = host1
+				printOut(host1, nowPlaying.show_title)
 			}
 			
 			// if no songlist key in now playing data, 
